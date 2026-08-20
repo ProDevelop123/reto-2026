@@ -41,15 +41,17 @@ docker compose up -d --build
 node tests/e2e/run.mjs               # 38 comprobaciones end-to-end
 ```
 
-Frontend:
+Frontend — vive en un repositorio aparte, para que Vercel lo despliegue de
+forma automatica: **[ProDevelop123/factorizacion-QR](https://github.com/ProDevelop123/factorizacion-QR)**
 
 ```bash
-cd web && npm install && cp .env.example .env && npm run dev
+git clone https://github.com/ProDevelop123/factorizacion-QR.git
+cd factorizacion-QR && npm install && cp .env.example .env && npm run dev
 ```
 
 → http://localhost:5173 · usuario `admin` · contraseña `Reto2026.Demo`
 
-![Workspace](web/docs/workspace.png)
+![Workspace](docs/img/workspace.png)
 
 ---
 
@@ -92,7 +94,7 @@ bloque para que la arquitectura se vea sin leer código.
 | Docker | 3 etapas por servicio · imágenes distroless |
 | Documentación del código | Comentarios que explican el *porqué*, no el *qué* |
 | **Opcional** · JWT | RS256 asimétrico, rotación y detección de reutilización |
-| **Opcional** · Frontend | [web/](web) |
+| **Opcional** · Frontend | [repositorio aparte](https://github.com/ProDevelop123/factorizacion-QR) |
 | **Opcional** · Tests unitarios y de integración | 29 en Go · 41 en Node · 38 end-to-end |
 
 ---
@@ -284,7 +286,6 @@ reto-2026/
 │  ├─ internal/core/         domain · port · usecase
 │  └─ internal/infrastructure/
 ├─ api-node/         Node 22 · Express 5 · capas
-├─ web/              React 19 · Vite · shadcn/ui
 ├─ keys/             par RSA (no versionado)
 ├─ scripts/          generación de claves
 ├─ tests/e2e/        prueba de integración sin dependencias
@@ -296,12 +297,15 @@ reto-2026/
 | Documento | Contenido |
 |---|---|
 | **[docs/backend.md](docs/backend.md)** | Las dos APIs: el algoritmo de Householder paso a paso, arquitectura hexagonal, autenticación y rotación de tokens, cálculo de estadísticas, referencia completa de endpoints y variables de entorno |
-| **[docs/frontend.md](docs/frontend.md)** | La aplicación React: flujos de login, factorización y renovación de sesión, la verificación matemática en el navegador, componentes y presentación de números |
+| **[docs/frontend.md](docs/frontend.md)** | Resumen del frontend, que vive en [su propio repositorio](https://github.com/ProDevelop123/factorizacion-QR). La documentación completa —flujos, verificación en el navegador, componentes— viaja con él |
 | **[docs/infraestructura.md](docs/infraestructura.md)** | Topología de red, imágenes multi-etapa y distroless, sondas de salud sin shell, endurecimiento de contenedores, operación, resolución de problemas y guía de despliegue |
 
 Cada servicio tiene además un README breve como puerta de entrada:
-[api-go](api-go/README.md) · [api-node](api-node/README.md) ·
-[web](web/README.md)
+[api-go](api-go/README.md) · [api-node](api-node/README.md)
+
+El **frontend vive en su propio repositorio**,
+[ProDevelop123/factorizacion-QR](https://github.com/ProDevelop123/factorizacion-QR), para que Vercel lo despliegue de forma
+automática al hacer push. Su documentación detallada viaja con él.
 
 ---
 
