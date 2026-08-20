@@ -1,0 +1,187 @@
+===============================================================================
+  CODING CHALLENGE - FACTORIZACION QR
+  Yeremi Carrion
+===============================================================================
+
+Sistema de dos APIs comunicadas por HTTP, con frontend y contenerizacion.
+
+  api-go     Recibe una matriz rectangular, calcula su factorizacion QR
+             mediante reflexiones de Householder y orquesta la llamada al
+             segundo servicio.   (Go 1.25 + Fiber v3)
+
+  api-node   Calcula estadisticas sobre las matrices resultantes: maximo,
+             minimo, promedio, suma total y deteccion de matriz diagonal.
+             (Node 22 + Express 5)
+
+  web        Interfaz que consume el sistema y verifica su correccion
+             matematica en el navegador.   (React 19 + Vite)
+
+
+-------------------------------------------------------------------------------
+  OPCION 1 - PROBARLO SIN INSTALAR NADA (lo mas rapido)
+-------------------------------------------------------------------------------
+
+El sistema esta desplegado y funcionando:
+
+  Aplicacion   https://factorizacion-qr-5w2q-green.vercel.app
+  API en Go    https://api-go-reto.onrender.com/health
+
+  Usuario      admin
+  Contrasena   Reto2026.Demo
+
+NOTA: los servicios estan en el plan gratuito de Render, que apaga las
+instancias por inactividad. La PRIMERA peticion puede tardar hasta 60
+segundos en responder mientras el servicio despierta. Las siguientes son
+inmediatas.
+
+
+-------------------------------------------------------------------------------
+  OPCION 2 - EJECUTARLO EN LOCAL
+-------------------------------------------------------------------------------
+
+REQUISITOS
+  - Docker Desktop           (para las dos APIs)
+  - Node 20 o superior       (solo para el frontend y las pruebas)
+
+
+PASO 1. Levantar el backend
+---------------------------
+
+Abrir una terminal en la carpeta "reto-2026" y ejecutar:
+
+    sh scripts/generate-keys.sh keys
+    docker compose up -d --build
+
+El primer arranque tarda un par de minutos porque compila las dos imagenes.
+Cuando termine, comprobar que ambos servicios estan sanos:
+
+    docker compose ps
+
+Deberia mostrar "healthy" en los dos.
+
+Si "sh" no esta disponible en la terminal, usar Git Bash, o generar las
+claves con openssl directamente:
+
+    mkdir keys
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out keys/private.pem
+    openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+
+
+PASO 2. Comprobar que el sistema funciona
+-----------------------------------------
+
+    node tests/e2e/run.mjs
+
+Ejecuta 38 comprobaciones contra los contenedores en marcha: autenticacion,
+factorizacion, orquestacion entre servicios, validacion de entrada, rotacion
+de tokens y aislamiento de red. Ademas RECALCULA la correccion matematica
+del resultado por su cuenta.
+
+No necesita instalar nada: usa unicamente el fetch nativo de Node.
+
+
+PASO 3. Levantar el frontend
+----------------------------
+
+Abrir otra terminal en la carpeta "factorizacion-QR":
+
+    pnpm install
+    copy .env.example .env          (en Windows)
+    cp .env.example .env            (en Linux o macOS)
+    pnpm dev
+
+Y abrir:  http://localhost:5173
+
+    Usuario      admin
+    Contrasena   Reto2026.Demo
+
+Si no se tiene pnpm:
+
+    corepack enable
+
+El proyecto fija la version del gestor de paquetes en package.json, de modo
+que corepack instalara la correcta automaticamente.
+
+
+-------------------------------------------------------------------------------
+  QUE MIRAR
+-------------------------------------------------------------------------------
+
+En la aplicacion, los cinco botones de ejemplo no son decorativos: cada uno
+demuestra una propiedad concreta del algoritmo.
+
+  Clasica 3x3          La matriz canonica de los libros.
+  Rectangular 3x2      Matriz no cuadrada, como pide el enunciado.
+  Diagonal             Activa el indicador de matriz diagonal.
+  Rango deficiente     Caso limite que rompe implementaciones ingenuas.
+  Mal condicionada     Matriz de Lauchli. Mirar el panel de verificacion:
+                       la ortogonalidad se mantiene en 1e-15, mientras que
+                       Gram-Schmidt clasico se desplomaria a 0.5.
+
+El panel "Verificacion independiente" no muestra datos de la API: recalcula
+Q*R y Q^T*Q en el navegador y mide los residuos. El cliente no confia en el
+servidor, lo comprueba.
+
+
+-------------------------------------------------------------------------------
+  DOCUMENTACION
+-------------------------------------------------------------------------------
+
+  reto-2026/README.md                   Vision general y decisiones tecnicas
+  reto-2026/docs/backend.md             Las dos APIs, en detalle
+  reto-2026/docs/infraestructura.md     Docker, red, operacion y despliegue
+  factorizacion-QR/docs/frontend.md     La aplicacion React, en detalle
+
+El README de la raiz de "reto-2026" es el documento principal: explica la
+interpretacion del enunciado, las decisiones que sostienen la solucion y las
+mediciones que las respaldan.
+
+
+-------------------------------------------------------------------------------
+  REPOSITORIOS
+-------------------------------------------------------------------------------
+
+  Backend    https://github.com/ProDevelop123/reto-2026
+  Frontend   https://github.com/ProDevelop123/factorizacion-QR
+
+El frontend esta separado para que Vercel lo despliegue automaticamente en
+cada push.
+
+
+-------------------------------------------------------------------------------
+  PRUEBAS
+-------------------------------------------------------------------------------
+
+  cd reto-2026/api-go     && go test ./... -cover     29 tests
+  cd reto-2026/api-node   && npm test                 41 tests
+  cd reto-2026           && node tests/e2e/run.mjs    38 comprobaciones
+
+Tambien se pueden ejecutar dentro de los contenedores, sin instalar Go ni
+Node en la maquina:
+
+  docker build --target test ./api-go       (incluye el detector de carreras)
+  docker build --target test ./api-node
+
+
+-------------------------------------------------------------------------------
+  SI ALGO FALLA
+-------------------------------------------------------------------------------
+
+  El servicio no arranca
+      docker compose logs api-go
+      La validacion de configuracion indica exactamente que falta.
+
+  "no se pudo leer la clave privada"
+      Faltan las claves. Volver al PASO 1.
+
+  Todas las peticiones devuelven 502
+      La API de estadisticas no esta sana:  docker compose ps
+
+  Error de CORS en el navegador
+      El frontend debe servirse en el puerto 5173, que es el que la API
+      declara como origen permitido.
+
+  "docker compose exec ... sh" no funciona
+      Es correcto: las imagenes son distroless y no contienen shell.
+
+===============================================================================
