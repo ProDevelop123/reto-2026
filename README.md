@@ -291,7 +291,15 @@ reto-2026/
 └─ docker-compose.yml
 ```
 
-Cada servicio tiene su propio README con el detalle:
+### Documentación
+
+| Documento | Contenido |
+|---|---|
+| **[docs/backend.md](docs/backend.md)** | Las dos APIs: el algoritmo de Householder paso a paso, arquitectura hexagonal, autenticación y rotación de tokens, cálculo de estadísticas, referencia completa de endpoints y variables de entorno |
+| **[docs/frontend.md](docs/frontend.md)** | La aplicación React: flujos de login, factorización y renovación de sesión, la verificación matemática en el navegador, componentes y presentación de números |
+| **[docs/infraestructura.md](docs/infraestructura.md)** | Topología de red, imágenes multi-etapa y distroless, sondas de salud sin shell, endurecimiento de contenedores, operación, resolución de problemas y guía de despliegue |
+
+Cada servicio tiene además un README breve como puerta de entrada:
 [api-go](api-go/README.md) · [api-node](api-node/README.md) ·
 [web](web/README.md)
 
