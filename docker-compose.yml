@@ -9,6 +9,45 @@ name: reto-2026
 
 services:
   # ---------------------------------------------------------------------------
+  # Generacion de claves
+  # ---------------------------------------------------------------------------
+  # Crea el par RSA que sostiene la autenticacion, si no existe ya.
+  #
+  # Existe para que arrancar el sistema sea UN SOLO COMANDO y no dependa de
+  # tener openssl instalado en la maquina: lo unico que hace falta es Docker,
+  # que ya es requisito. Las claves NO se versionan ni viajan en la entrega;
+  # cada entorno genera las suyas en el primer arranque.
+  #
+  # Es idempotente: si las claves ya estan, no las toca. Regenerarlas en cada
+  # arranque invalidaria las sesiones abiertas.
+  init-keys:
+    image: alpine/openssl:3.5.7
+    # El script se pasa como lista de UN SOLO elemento, no como bloque de texto.
+    #
+    # Con `command:` en forma de cadena, Compose la divide en palabras y `sh -c`
+    # recibiria solo la primera: el resto se convertiria en argumentos y el
+    # script no llegaria a ejecutarse.
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ -f /keys/private.pem ] && [ -f /keys/public/public.pem ]; then
+          echo "Las claves ya existen; no se regeneran."
+          exit 0
+        fi
+        echo "Generando par de claves RSA de 2048 bits..."
+        mkdir -p /keys/public
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /keys/private.pem 2>/dev/null
+        openssl rsa -in /keys/private.pem -pubout -out /keys/public.pem 2>/dev/null
+        cp /keys/public.pem /keys/public/public.pem
+        chmod 644 /keys/private.pem /keys/public.pem /keys/public/public.pem
+        echo "Claves generadas en ./keys"
+    volumes:
+      - ./keys:/keys
+    networks:
+      - reto
+
+  # ---------------------------------------------------------------------------
   # API de estadisticas (Node.js + Express)
   # ---------------------------------------------------------------------------
   api-node:
@@ -44,13 +83,23 @@ services:
       JWT_PUBLIC_KEY_PATH: /keys/public.pem
 
     volumes:
-      # Se monta EXCLUSIVAMENTE la clave publica, y en solo lectura.
+      # Se monta un DIRECTORIO que contiene UNICAMENTE la clave publica.
       #
       # El contenedor de Node no tiene forma de leer la clave privada: no esta
       # en su sistema de ficheros. La separacion de privilegios entre firmar y
       # verificar deja de ser una convencion del codigo y pasa a estar impuesta
       # por la infraestructura.
-      - ./keys/public.pem:/keys/public.pem:ro
+      #
+      # Se monta el directorio y no el fichero suelto a proposito: si se monta
+      # un fichero que todavia no existe, Docker crea en su lugar un DIRECTORIO
+      # con ese nombre y el arranque falla. Con un directorio no ocurre, y ademas
+      # el contenido se refleja en vivo, de modo que las claves que genera
+      # init-keys aparecen dentro sin necesidad de recrear el contenedor.
+      - ./keys/public:/keys:ro
+
+    depends_on:
+      init-keys:
+        condition: service_completed_successfully
 
     healthcheck:
       # Invoca el script de sonda del propio servicio: la imagen es distroless
@@ -146,6 +195,9 @@ services:
       - ./keys:/keys:ro
 
     depends_on:
+      init-keys:
+        # Sin las claves, la validacion de configuracion aborta el arranque.
+        condition: service_completed_successfully
       api-node:
         # No basta con que el contenedor exista: debe estar respondiendo. Sin
         # esta condicion, la API en Go aceptaria peticiones antes de que su

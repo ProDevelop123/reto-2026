@@ -3,9 +3,20 @@
 # se inyectan desde el gestor de secretos de la plataforma. Una clave privada
 # subida al repositorio queda en el historial para siempre, incluso si se
 # borra despues.
-keys/
+# El patron cubre keys/, keys.rar, keys.zip y cualquier variante: una clave
+# privada subida al repositorio queda en el historial para siempre, aunque se
+# borre despues, y hay que darla por comprometida.
+keys*
 *.pem
 *.key
+*.p12
+*.pfx
+
+# Archivos comprimidos: se generan para la entrega, no se versionan.
+*.rar
+*.zip
+*.7z
+*.tar.gz
 
 .env
 .env.local

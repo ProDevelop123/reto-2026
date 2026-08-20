@@ -13,81 +13,110 @@ Sistema de dos APIs comunicadas por HTTP, con frontend y contenerizacion.
              minimo, promedio, suma total y deteccion de matriz diagonal.
              (Node 22 + Express 5)
 
-  web        Interfaz que consume el sistema y verifica su correccion
+  frontend   Interfaz que consume el sistema y verifica su correccion
              matematica en el navegador.   (React 19 + Vite)
+             Vive en un repositorio aparte, para que Vercel lo despliegue
+             de forma automatica.
+
+REPOSITORIOS
+
+  Backend    https://github.com/ProDevelop123/reto-2026
+  Frontend   https://github.com/ProDevelop123/factorizacion-QR
 
 
--------------------------------------------------------------------------------
-  OPCION 1 - PROBARLO SIN INSTALAR NADA (lo mas rapido)
--------------------------------------------------------------------------------
+===============================================================================
+  OPCION A - PROBARLO SIN INSTALAR NADA
+===============================================================================
 
-El sistema esta desplegado y funcionando:
+El sistema esta desplegado:
 
   Aplicacion   https://factorizacion-qr-5w2q-green.vercel.app
-  API en Go    https://api-go-reto.onrender.com/health
 
   Usuario      admin
   Contrasena   Reto2026.Demo
 
-NOTA: los servicios estan en el plan gratuito de Render, que apaga las
+IMPORTANTE: las APIs estan en el plan gratuito de Render, que apaga las
 instancias por inactividad. La PRIMERA peticion puede tardar hasta 60
-segundos en responder mientras el servicio despierta. Las siguientes son
-inmediatas.
+segundos mientras el servicio despierta. Las siguientes son inmediatas.
+Si el primer intento parece colgado, esperar y reintentar.
 
+
+===============================================================================
+  OPCION B - EJECUTARLO EN LOCAL
+===============================================================================
 
 -------------------------------------------------------------------------------
-  OPCION 2 - EJECUTARLO EN LOCAL
+  B.1  BACKEND - las dos APIs
 -------------------------------------------------------------------------------
 
-REQUISITOS
-  - Docker Desktop           (para las dos APIs)
-  - Node 20 o superior       (solo para el frontend y las pruebas)
+REQUISITO UNICO:  Docker Desktop en marcha.
 
+No hace falta instalar Go, ni Node, ni openssl, ni generar claves a mano.
 
-PASO 1. Levantar el backend
----------------------------
-
-Abrir una terminal en la carpeta "reto-2026" y ejecutar:
-
-    sh scripts/generate-keys.sh keys
+    git clone https://github.com/ProDevelop123/reto-2026.git
+    cd reto-2026
     docker compose up -d --build
 
-El primer arranque tarda un par de minutos porque compila las dos imagenes.
-Cuando termine, comprobar que ambos servicios estan sanos:
+Y ya esta. El primer arranque tarda un par de minutos porque compila las dos
+imagenes desde cero.
+
+Que ocurre al ejecutarlo:
+
+    1. Un contenedor de inicializacion genera el par de claves RSA en ./keys
+       si no existe. Las claves NO viajan en el repositorio: cada entorno
+       genera las suyas.
+    2. Arranca la API de estadisticas y se espera a que responda.
+    3. Arranca la API de factorizacion.
+
+Comprobar que ambas estan sanas:
 
     docker compose ps
 
-Deberia mostrar "healthy" en los dos.
+Debe mostrar "healthy" en api-go y api-node. El servicio init-keys aparece
+como "exited (0)": es correcto, su trabajo es generar las claves y terminar.
 
-Si "sh" no esta disponible en la terminal, usar Git Bash, o generar las
-claves con openssl directamente:
+    URL de la API      http://localhost:8080
+    Comprobacion       http://localhost:8080/health
 
-    mkdir keys
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out keys/private.pem
-    openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+NOTA: api-node no publica ningun puerto al host, a proposito. Es un servicio
+interno al que solo llega la API en Go por la red del compose. No es un
+fallo: es la topologia que se quiso demostrar.
 
 
-PASO 2. Comprobar que el sistema funciona
------------------------------------------
+-------------------------------------------------------------------------------
+  B.2  COMPROBAR QUE FUNCIONA
+-------------------------------------------------------------------------------
+
+Requiere Node 18 o superior instalado (solo para lanzar el script; no
+instala ninguna dependencia).
 
     node tests/e2e/run.mjs
 
 Ejecuta 38 comprobaciones contra los contenedores en marcha: autenticacion,
 factorizacion, orquestacion entre servicios, validacion de entrada, rotacion
-de tokens y aislamiento de red. Ademas RECALCULA la correccion matematica
-del resultado por su cuenta.
+de tokens, proteccion CSRF y aislamiento de red. Ademas RECALCULA por su
+cuenta la correccion matematica del resultado.
 
-No necesita instalar nada: usa unicamente el fetch nativo de Node.
+Deberia terminar con "38 correctas, 0 fallidas".
+
+Si no se tiene Node, se puede probar la API a mano:
+
+    curl -X POST http://localhost:8080/api/v1/auth/login ^
+      -H "Content-Type: application/json" ^
+      -d "{\"username\":\"admin\",\"password\":\"Reto2026.Demo\"}"
+
+(en Linux o macOS, sustituir el ^ final de linea por \)
 
 
-PASO 3. Levantar el frontend
-----------------------------
+-------------------------------------------------------------------------------
+  B.3  FRONTEND
+-------------------------------------------------------------------------------
 
-Abrir otra terminal en la carpeta "factorizacion-QR":
+REQUISITOS:  Node 20 o superior, y el backend del paso B.1 en marcha.
 
+    git clone https://github.com/ProDevelop123/factorizacion-QR.git
+    cd factorizacion-QR
     pnpm install
-    copy .env.example .env          (en Windows)
-    cp .env.example .env            (en Linux o macOS)
     pnpm dev
 
 Y abrir:  http://localhost:5173
@@ -99,18 +128,26 @@ Si no se tiene pnpm:
 
     corepack enable
 
-El proyecto fija la version del gestor de paquetes en package.json, de modo
-que corepack instalara la correcta automaticamente.
+(corepack viene incluido con Node 16.9 y posteriores; el proyecto fija la
+version exacta del gestor en package.json, asi que se instalara sola)
+
+NO hace falta crear ningun fichero .env: el valor por defecto ya apunta a
+http://localhost:8080, que es donde escucha el backend.
+
+El puerto 5173 es fijo a proposito: es el origen que la API en Go declara
+como permitido. Si estuviera ocupado, Vite fallara al arrancar en lugar de
+elegir otro puerto en silencio, porque hacerlo provocaria errores de CORS
+dificiles de diagnosticar.
 
 
--------------------------------------------------------------------------------
+===============================================================================
   QUE MIRAR
--------------------------------------------------------------------------------
+===============================================================================
 
-En la aplicacion, los cinco botones de ejemplo no son decorativos: cada uno
-demuestra una propiedad concreta del algoritmo.
+En la aplicacion hay cinco botones de ejemplo. Ninguno es decorativo: cada
+uno demuestra una propiedad concreta del algoritmo.
 
-  Clasica 3x3          La matriz canonica de los libros.
+  Clasica 3x3          La matriz canonica de los libros de algebra lineal.
   Rectangular 3x2      Matriz no cuadrada, como pide el enunciado.
   Diagonal             Activa el indicador de matriz diagonal.
   Rango deficiente     Caso limite que rompe implementaciones ingenuas.
@@ -118,70 +155,82 @@ demuestra una propiedad concreta del algoritmo.
                        la ortogonalidad se mantiene en 1e-15, mientras que
                        Gram-Schmidt clasico se desplomaria a 0.5.
 
-El panel "Verificacion independiente" no muestra datos de la API: recalcula
-Q*R y Q^T*Q en el navegador y mide los residuos. El cliente no confia en el
-servidor, lo comprueba.
+El panel "Verificacion independiente" no muestra datos que devuelva la API:
+recalcula Q*R y Q^T*Q en el navegador y mide los residuos. El cliente no
+confia en el servidor, lo comprueba.
+
+Cada bloque del resultado indica que componente lo produjo: la factorizacion
+viene de la API en Go, las estadisticas de la API en Node, y los residuos se
+calculan en el navegador.
 
 
--------------------------------------------------------------------------------
+===============================================================================
   DOCUMENTACION
--------------------------------------------------------------------------------
+===============================================================================
 
-  reto-2026/README.md                   Vision general y decisiones tecnicas
-  reto-2026/docs/backend.md             Las dos APIs, en detalle
-  reto-2026/docs/infraestructura.md     Docker, red, operacion y despliegue
-  factorizacion-QR/docs/frontend.md     La aplicacion React, en detalle
+  README.md                          Vision general y decisiones tecnicas
+  docs/backend.md                    Las dos APIs, en detalle
+  docs/infraestructura.md            Docker, red, operacion y despliegue
+  docs/frontend.md                   Resumen del frontend
 
-El README de la raiz de "reto-2026" es el documento principal: explica la
-interpretacion del enunciado, las decisiones que sostienen la solucion y las
-mediciones que las respaldan.
+  En el repositorio del frontend:
+  docs/frontend.md                   La aplicacion React, en detalle
 
-
--------------------------------------------------------------------------------
-  REPOSITORIOS
--------------------------------------------------------------------------------
-
-  Backend    https://github.com/ProDevelop123/reto-2026
-  Frontend   https://github.com/ProDevelop123/factorizacion-QR
-
-El frontend esta separado para que Vercel lo despliegue automaticamente en
-cada push.
+El README de la raiz es el documento principal: explica la interpretacion del
+enunciado, las decisiones que sostienen la solucion y las mediciones que las
+respaldan.
 
 
--------------------------------------------------------------------------------
+===============================================================================
   PRUEBAS
--------------------------------------------------------------------------------
+===============================================================================
 
-  cd reto-2026/api-go     && go test ./... -cover     29 tests
-  cd reto-2026/api-node   && npm test                 41 tests
-  cd reto-2026           && node tests/e2e/run.mjs    38 comprobaciones
+Sin instalar Go ni Node, dentro de contenedores:
 
-Tambien se pueden ejecutar dentro de los contenedores, sin instalar Go ni
-Node en la maquina:
+    docker build --target test ./api-go       (incluye el detector de carreras)
+    docker build --target test ./api-node
 
-  docker build --target test ./api-go       (incluye el detector de carreras)
-  docker build --target test ./api-node
+Con las herramientas instaladas en la maquina:
+
+    cd api-go     && go test ./... -cover      29 tests
+    cd api-node   && npm install && npm test   41 tests
+    node tests/e2e/run.mjs                     38 comprobaciones
 
 
--------------------------------------------------------------------------------
+===============================================================================
   SI ALGO FALLA
--------------------------------------------------------------------------------
+===============================================================================
 
-  El servicio no arranca
+  El comando "docker compose" no existe
+      Docker Desktop no esta instalado o no esta en marcha. Con versiones
+      antiguas el comando es "docker-compose" con guion.
+
+  Un servicio no llega a "healthy"
       docker compose logs api-go
+      docker compose logs api-node
       La validacion de configuracion indica exactamente que falta.
 
-  "no se pudo leer la clave privada"
-      Faltan las claves. Volver al PASO 1.
+  init-keys aparece como "exited"
+      Es correcto. Genera las claves y termina; no es un servicio que deba
+      permanecer en marcha.
+
+  El puerto 8080 esta ocupado
+      Crear un fichero .env en la raiz con:  API_PORT=9090
+      Y volver a ejecutar docker compose up -d
 
   Todas las peticiones devuelven 502
-      La API de estadisticas no esta sana:  docker compose ps
+      La API de estadisticas no esta sana. Revisar docker compose ps.
 
   Error de CORS en el navegador
-      El frontend debe servirse en el puerto 5173, que es el que la API
-      declara como origen permitido.
+      El frontend debe servirse en el puerto 5173, que es el origen que la
+      API declara como permitido.
 
   "docker compose exec ... sh" no funciona
-      Es correcto: las imagenes son distroless y no contienen shell.
+      Es correcto: las imagenes son distroless y no contienen shell. Para
+      sondear la API en Go:  docker compose exec api-go /app/api healthcheck
+
+  Empezar de cero
+      docker compose down -v
+      docker compose up -d --build
 
 ===============================================================================

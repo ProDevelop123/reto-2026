@@ -13,18 +13,22 @@ respuesta.
 
 ## Arranque
 
-```bash
-sh ../scripts/generate-keys.sh ../keys   # solo la primera vez
-cp .env.example .env
-go run ./cmd/api
-```
-
-Requiere la API de Node escuchando en `STATISTICS_API_URL`. Lo más cómodo es
-levantar todo el sistema desde la raíz del repositorio:
+Lo mas comodo es levantar todo el sistema desde la raiz del repositorio, que
+genera las claves automaticamente:
 
 ```bash
 docker compose up -d --build
 ```
+
+Para ejecutar solo este servicio, fuera de Docker:
+
+```bash
+sh ../scripts/generate-keys.sh ../keys   # solo si no hay claves todavia
+cp .env.example .env
+go run ./cmd/api
+```
+
+Requiere la API de Node escuchando en `STATISTICS_API_URL`.
 
 ## Tests
 

@@ -36,10 +36,13 @@ completa.
 ## Arranque
 
 ```bash
-sh scripts/generate-keys.sh keys     # par RSA, solo la primera vez
-docker compose up -d --build
+docker compose up -d --build         # un solo comando: genera las claves y levanta todo
 node tests/e2e/run.mjs               # 38 comprobaciones end-to-end
 ```
+
+**No hay pasos previos.** El propio `docker compose` genera el par de claves RSA
+en el primer arranque, de modo que lo unico que hace falta es Docker. Las claves
+nunca se versionan: cada entorno genera las suyas.
 
 Frontend — vive en un repositorio aparte, para que Vercel lo despliegue de
 forma automatica: **[ProDevelop123/factorizacion-QR](https://github.com/ProDevelop123/factorizacion-QR)**

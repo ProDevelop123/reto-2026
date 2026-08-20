@@ -333,7 +333,31 @@ cp .env.example .env
 
 ## 5. Gestión de claves
 
-### 5.1 Generación
+### 5.1 Generación automática
+
+**No hay ningún paso manual.** El `docker compose` incluye un servicio de
+inicialización que genera el par si no existe:
+
+```bash
+docker compose up -d --build     # genera las claves y levanta todo
+```
+
+Se hizo así por dos razones. La primera, que arrancar el sistema sea **un solo
+comando**: no hace falta tener `openssl` ni un shell POSIX en la máquina, solo
+Docker, que ya es requisito. La segunda, y más importante, que **ninguna clave
+tenga que viajar en el repositorio ni en la entrega**: cada entorno genera la
+suya en el primer arranque.
+
+Es **idempotente**: si las claves ya están, no las toca. Regenerarlas en cada
+arranque invalidaría las sesiones abiertas.
+
+```
+keys/private.pem          →  firma de tokens (SOLO la API en Go)
+keys/public.pem           →  verificación
+keys/public/public.pem    →  copia que se monta en la API de estadísticas
+```
+
+Para el flujo sin Docker sigue existiendo el script equivalente:
 
 ```bash
 sh scripts/generate-keys.sh keys
@@ -341,11 +365,6 @@ sh scripts/generate-keys.sh keys
 
 Produce un par RSA de 2048 bits en formato PKCS#8, que es el que espera
 `golang-jwt` sin conversiones.
-
-```
-keys/private.pem   →  firma de tokens (SOLO la API en Go)
-keys/public.pem    →  verificación (API en Node, y quien haga falta)
-```
 
 ### 5.2 Nunca se versionan ni se hornean en la imagen
 
@@ -363,12 +382,19 @@ Aquí está la garantía de seguridad más fuerte del sistema:
 ```yaml
 api-node:
   volumes:
-    - ./keys/public.pem:/keys/public.pem:ro      # SOLO la pública
+    - ./keys/public:/keys:ro     # un DIRECTORIO que solo contiene la pública
 
 api-go:
   volumes:
-    - ./keys:/keys:ro                            # ambas
+    - ./keys:/keys:ro            # ambas
 ```
+
+**Se monta un directorio y no el fichero suelto**, y no es un detalle
+estético. Si se monta un fichero que todavía no existe, Docker crea en su lugar
+un **directorio** con ese nombre y el arranque falla — exactamente lo que
+ocurriría en un clon recién hecho, donde las claves aún no se han generado. Con
+un directorio no ocurre, y además su contenido se refleja en vivo, de modo que
+las claves que produce `init-keys` aparecen dentro sin recrear el contenedor.
 
 **El contenedor de Node no tiene forma de leer la clave privada: no está en su
 sistema de ficheros.** La separación entre firmar y verificar deja de ser una
