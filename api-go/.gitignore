@@ -1,0 +1,12 @@
+# Binarios
+/api
+/app-binary
+*.exe
+
+# Configuracion local y secretos
+.env
+keys/
+
+# Cobertura
+*.out
+coverage.html

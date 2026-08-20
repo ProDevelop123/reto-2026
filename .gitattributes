@@ -1,0 +1,22 @@
+# Normalizacion de finales de linea.
+#
+# El repositorio se desarrolla en Windows pero se ejecuta en contenedores Linux.
+# Sin esta normalizacion, los ficheros llegarian al contenedor con finales CRLF
+# y algunos dejarian de funcionar sin un mensaje de error util.
+
+# Por defecto: detectar texto y almacenarlo con LF en el repositorio.
+* text=auto eol=lf
+
+# --- Ficheros que DEBEN tener LF si o si -----------------------------------
+# Un script de shell con CRLF falla en Linux con "bad interpreter: no such file
+# or directory", porque el \r pasa a formar parte del nombre del interprete.
+*.sh          text eol=lf
+Dockerfile    text eol=lf
+*.dockerignore text eol=lf
+.env.example  text eol=lf
+
+# --- Binarios: nunca tocar -------------------------------------------------
+*.png  binary
+*.jpg  binary
+*.woff2 binary
+*.pem  binary

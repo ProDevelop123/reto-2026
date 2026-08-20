@@ -1,0 +1,180 @@
+# Orquestacion local del sistema completo.
+#
+#   docker compose up --build
+#
+# Topologia: la API en Go es el UNICO punto de entrada. La API de Node es un
+# servicio backend puro, alcanzable solo desde la red interna del compose.
+
+name: reto-2026
+
+services:
+  # ---------------------------------------------------------------------------
+  # API de estadisticas (Node.js + Express)
+  # ---------------------------------------------------------------------------
+  api-node:
+    build:
+      context: ./api-node
+      target: runtime
+    image: reto-2026/api-node:dev
+    restart: unless-stopped
+
+    # NO se publica ningun puerto al host, deliberadamente.
+    #
+    # Este servicio solo lo consume la API en Go, servidor a servidor, a traves
+    # de la red interna. Publicarlo lo expondria sin necesidad y permitiria
+    # saltarse por completo al orquestador. Principio de menor privilegio
+    # aplicado a la topologia de red.
+    #
+    # Descomentar UNICAMENTE para inspeccionarlo de forma aislada durante una
+    # demostracion o al depurar:
+    # ports:
+    #   - "3001:3001"
+
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      LOG_LEVEL: ${NODE_LOG_LEVEL:-info}
+      DIAGONAL_TOLERANCE: ${DIAGONAL_TOLERANCE:-1e-9}
+
+      # Verificacion de tokens. Este servicio NO puede emitirlos: solo dispone
+      # de la clave publica.
+      JWT_ENABLED: "true"
+      JWT_ISSUER: ${JWT_ISSUER:-reto-2026-api-go}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-reto-2026}
+      JWT_PUBLIC_KEY_PATH: /keys/public.pem
+
+    volumes:
+      # Se monta EXCLUSIVAMENTE la clave publica, y en solo lectura.
+      #
+      # El contenedor de Node no tiene forma de leer la clave privada: no esta
+      # en su sistema de ficheros. La separacion de privilegios entre firmar y
+      # verificar deja de ser una convencion del codigo y pasa a estar impuesta
+      # por la infraestructura.
+      - ./keys/public.pem:/keys/public.pem:ro
+
+    healthcheck:
+      # Invoca el script de sonda del propio servicio: la imagen es distroless
+      # y no dispone de shell, curl ni wget.
+      test: ["CMD", "/nodejs/bin/node", "src/healthcheck.js"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    # --- Endurecimiento del contenedor ---
+    # El proceso no escribe nada en disco: los logs van a stdout, que es lo que
+    # esperan los recolectores de las plataformas de contenedores.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    networks:
+      - reto
+
+  # ---------------------------------------------------------------------------
+  # API de factorizacion QR (Go + Fiber v3)
+  # ---------------------------------------------------------------------------
+  api-go:
+    build:
+      context: ./api-go
+      target: runtime
+      args:
+        VERSION: ${VERSION:-0.1.0}
+    image: reto-2026/api-go:dev
+    restart: unless-stopped
+
+    # Unico servicio expuesto al host: es el punto de entrada del sistema.
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+    environment:
+      APP_NAME: reto-2026-api-go
+      # Se ejecuta en modo produccion tambien en local para que la validacion
+      # de configuracion del arranque se ejercite de verdad, en lugar de
+      # quedar solo para el despliegue.
+      APP_ENV: production
+      PORT: "8080"
+      LOG_LEVEL: ${GO_LOG_LEVEL:-info}
+
+      # Descubrimiento de servicio por DNS del orquestador: "api-node" lo
+      # resuelve el resolutor interno de Docker dentro de esta red. Solo
+      # funciona en redes definidas por el usuario, no en la bridge por defecto.
+      #
+      # La variable nombra la CAPACIDAD, no la tecnologia: si manana la sirviera
+      # otro servicio, el nombre seguiria siendo correcto.
+      STATISTICS_API_URL: http://api-node:3001
+      # Timeout por intento, y techo global para toda la operacion incluidos
+      # reintentos: sin el segundo, la peor latencia seria el primero
+      # multiplicado por el numero de intentos.
+      STATISTICS_TIMEOUT: ${STATISTICS_TIMEOUT:-3s}
+      STATISTICS_TOTAL_TIMEOUT: ${STATISTICS_TOTAL_TIMEOUT:-8s}
+      STATISTICS_MAX_RETRIES: ${STATISTICS_MAX_RETRIES:-2}
+
+      # Emision y verificacion de tokens. Este servicio es el unico que posee
+      # la clave privada.
+      JWT_ISSUER: ${JWT_ISSUER:-reto-2026-api-go}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-reto-2026}
+      JWT_PRIVATE_KEY_PATH: /keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /keys/public.pem
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-168h}
+
+      # Credenciales del login simulado. El arranque falla si en modo produccion
+      # se conserva el valor por defecto del codigo, de ahi que aqui se defina
+      # una distinta.
+      AUTH_USERNAME: ${AUTH_USERNAME:-admin}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-Reto2026.Demo}
+
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+
+      # ATENCION: en local se sirve por HTTP plano sobre localhost, de modo que
+      # la cookie usa Lax sin Secure. En el despliegue real (frontend en Vercel,
+      # APIs en GCP) la peticion de refresco es de origen cruzado y hara falta
+      # SameSite=None con Secure=true, que exige HTTPS. Son los valores por
+      # defecto del codigo en produccion; aqui se sobreescriben a proposito.
+      REFRESH_COOKIE_SAMESITE: Lax
+      REFRESH_COOKIE_SECURE: "false"
+
+    volumes:
+      # Ambas claves, en solo lectura. Nunca se copian dentro de la imagen: una
+      # clave privada horneada en una capa queda ahi para siempre y viaja a
+      # cualquier registro donde se publique.
+      - ./keys:/keys:ro
+
+    depends_on:
+      api-node:
+        # No basta con que el contenedor exista: debe estar respondiendo. Sin
+        # esta condicion, la API en Go aceptaria peticiones antes de que su
+        # dependencia estuviera lista y las primeras devolverian 502.
+        condition: service_healthy
+
+    healthcheck:
+      # El propio binario sabe sondearse: la imagen distroless no tiene shell.
+      test: ["CMD", "/app/api", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    networks:
+      - reto
+
+# -----------------------------------------------------------------------------
+# Red
+# -----------------------------------------------------------------------------
+networks:
+  reto:
+    # Red definida por el usuario, condicion necesaria para que funcione la
+    # resolucion DNS por nombre de servicio. La red bridge por defecto de Docker
+    # no la ofrece.
+    driver: bridge

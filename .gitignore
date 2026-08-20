@@ -1,0 +1,32 @@
+# --- SECRETOS: nunca versionar --------------------------------------------
+# Las claves se generan por entorno con scripts/generate-keys.sh y en la nube
+# se inyectan desde el gestor de secretos de la plataforma. Una clave privada
+# subida al repositorio queda en el historial para siempre, incluso si se
+# borra despues.
+keys/
+*.pem
+*.key
+
+.env
+.env.local
+.env.*.local
+
+# --- Dependencias y artefactos --------------------------------------------
+node_modules/
+coverage/
+dist/
+*.log
+
+# Binarios de Go
+/api-go/api
+/api-go/app-binary
+*.exe
+*.out
+coverage.html
+
+# --- Editores y SO ---------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

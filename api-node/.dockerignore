@@ -1,0 +1,13 @@
+node_modules
+coverage
+.env
+.env.*
+*.log
+
+# Dockerfile y .dockerignore no aportan nada dentro de la imagen.
+Dockerfile
+.dockerignore
+
+# Los tests SI entran en el contexto: la etapa "test" del Dockerfile ejecuta la
+# bateria dentro del contenedor. Sin ellos la etapa pasaria en vacio y daria una
+# confianza falsa. No llegan a la imagen final, que solo copia src y node_modules.

@@ -1,0 +1,29 @@
+# Todo lo que no necesita la compilacion. Reduce el contexto que se envia al
+# demonio de Docker y, sobre todo, evita que secretos locales acaben dentro de
+# una capa de la imagen.
+
+.env
+.env.*
+keys/
+*.pem
+
+.git
+.gitignore
+
+# Los ficheros _test.go SI entran en el contexto, a proposito.
+#
+# La etapa "test" del Dockerfile ejecuta la bateria con el detector de carreras
+# dentro del contenedor, y sin ellos `go test` no encontraria nada que ejecutar:
+# la etapa pasaria en vacio y daria una confianza falsa. No llegan a la imagen
+# final porque la etapa de ejecucion solo copia el binario ya compilado.
+
+# Artefactos de compilacion local: se recompila dentro del contenedor.
+/api
+/app-binary
+*.exe
+*.out
+coverage.html
+
+Dockerfile
+.dockerignore
+README.md
