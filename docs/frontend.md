@@ -98,9 +98,9 @@ La solución son cinco líneas que hacen que todas compartan una única promesa.
 ```bash
 git clone https://github.com/ProDevelop123/factorizacion-QR.git
 cd factorizacion-QR
-npm install
+pnpm install
 cp .env.example .env      # VITE_API_URL=http://localhost:8080
-npm run dev
+pnpm dev
 ```
 
 → http://localhost:5173 · usuario `admin` · contraseña `Reto2026.Demo`

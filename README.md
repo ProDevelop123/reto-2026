@@ -46,7 +46,7 @@ forma automatica: **[ProDevelop123/factorizacion-QR](https://github.com/ProDevel
 
 ```bash
 git clone https://github.com/ProDevelop123/factorizacion-QR.git
-cd factorizacion-QR && npm install && cp .env.example .env && npm run dev
+cd factorizacion-QR && pnpm install && cp .env.example .env && pnpm dev
 ```
 
 → http://localhost:5173 · usuario `admin` · contraseña `Reto2026.Demo`
